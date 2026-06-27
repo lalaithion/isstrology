@@ -1,10 +1,9 @@
 """The astronomy v1 only pretended to do, now for many objects.
 
-For each target the registry (see targets.py) produces a Skyfield position seen
-from the observer; this module reads its ecliptic longitude of date and maps it
-to a zodiac sign. Earth satellites get there via SGP4 (where the observer's
-position matters enormously — low-orbit parallax is huge); solar-system bodies
-via a planetary ephemeris (where it barely matters at all)."""
+Each target (see targets.py) returns a display-ready Observation; this module
+maps its ecliptic longitude to a zodiac sign and assembles the result. Satellites
+are computed live via SGP4 (observer parallax is huge in low orbit); bodies are a
+lookup into a precomputed grid (they're slow and effectively location-agnostic)."""
 
 from __future__ import annotations
 
@@ -13,13 +12,10 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
-from skyfield.api import wgs84
-
 from . import targets
-from .targets import TargetMeta
+from .targets import MissingDataError, TargetMeta
+from .tle_archive import OutOfCoverageError
 from .zodiac import Sign, sign_for_longitude
-
-_ts = targets.timescale()
 
 
 @lru_cache(maxsize=1)
@@ -51,17 +47,17 @@ class SkyResult:
     target: TargetMeta
     sign: Sign
     ecliptic_longitude: float
-    ecliptic_latitude: float
-    ra_hours: float
-    dec_degrees: float
-    altitude_degrees: float
-    azimuth_degrees: float
-    visible: bool
-    distance_km: float
     distance_au: float
     when_utc: datetime
     provenance: str
     confidence: str
+    # Satellite-only (the observer-dependent geometry); None for bodies.
+    distance_km: float | None = None
+    ra_hours: float | None = None
+    dec_degrees: float | None = None
+    altitude_degrees: float | None = None
+    azimuth_degrees: float | None = None
+    visible: bool | None = None
 
 
 def compute(target_key: str, when_utc: datetime, lat: float, lon: float,
@@ -70,36 +66,72 @@ def compute(target_key: str, when_utc: datetime, lat: float, lon: float,
 
     `when_utc` must be tz-aware UTC. Raises tle_archive.OutOfCoverageError if the
     instant is outside the target's coverage, targets.MissingDataError if the
-    target's data file hasn't been fetched, KeyError for an unknown target.
+    target's data hasn't been built, KeyError for an unknown target.
     """
     if when_utc.tzinfo is None:
         raise ValueError("when_utc must be timezone-aware (UTC)")
     when_utc = when_utc.astimezone(timezone.utc)
 
     target = targets.get_target(target_key)
-    observer = wgs84.latlon(lat, lon, elevation_m=elevation_m)
-    t = _ts.from_datetime(when_utc)
-
-    obs = target.observe(t, observer, when_utc)
-    pos = obs.position
-
-    ecl_lat, ecl_lon, _ = pos.ecliptic_latlon(epoch=t)  # ecliptic of date
-    ra, dec, distance = pos.radec(epoch=t)
-    alt, az, _ = pos.altaz()
+    obs = target.observe(when_utc, lat, lon, elevation_m=elevation_m)
 
     return SkyResult(
         target=target.meta,
-        sign=sign_for_longitude(ecl_lon.degrees),
-        ecliptic_longitude=ecl_lon.degrees % 360.0,
-        ecliptic_latitude=ecl_lat.degrees,
-        ra_hours=ra.hours,
-        dec_degrees=dec.degrees,
-        altitude_degrees=alt.degrees,
-        azimuth_degrees=az.degrees,
-        visible=alt.degrees > 0.0,
-        distance_km=distance.km,
-        distance_au=distance.au,
+        sign=sign_for_longitude(obs.ecliptic_longitude),
+        ecliptic_longitude=obs.ecliptic_longitude,
+        distance_au=obs.distance_au,
         when_utc=when_utc,
         provenance=obs.provenance,
         confidence=obs.confidence,
+        distance_km=obs.distance_km,
+        ra_hours=obs.ra_hours,
+        dec_degrees=obs.dec_degrees,
+        altitude_degrees=obs.altitude_degrees,
+        azimuth_degrees=obs.azimuth_degrees,
+        visible=obs.visible,
     )
+
+
+@dataclass(frozen=True)
+class Row:
+    """One object's outcome for the all-objects table."""
+    meta: TargetMeta
+    result: SkyResult | None
+    status: str  # "ok" | "pre" | "post" | "nodata"
+    note: str    # short human tag for non-ok rows
+
+
+def compute_all(when_utc: datetime, lat: float, lon: float) -> list[Row]:
+    """A Row for every registered object: its sign, or why it has none
+    (not yet launched, re-entered, beyond our data)."""
+    when_utc = when_utc.astimezone(timezone.utc)
+    rows: list[Row] = []
+    for target in targets.all_targets():
+        meta = target.meta
+        try:
+            rows.append(Row(meta, compute(meta.key, when_utc, lat, lon), "ok", ""))
+            continue
+        except OutOfCoverageError:
+            pass
+        except MissingDataError:
+            rows.append(Row(meta, None, "nodata", "Data not loaded"))
+            continue
+        # Out of coverage: classify as before-launch vs after-end for a tag.
+        try:
+            first, last = target.coverage()
+        except MissingDataError:
+            rows.append(Row(meta, None, "nodata", "Data not loaded"))
+            continue
+        if when_utc < first:
+            note = ("Not yet launched" if meta.category == "satellite"
+                    else "Before our ephemeris")
+            rows.append(Row(meta, None, "pre", note))
+        else:
+            if meta.category != "satellite":
+                note = "After our ephemeris"
+            elif getattr(target, "decayed", False):
+                note = f"Re-entered {last:%Y}"
+            else:
+                note = "Beyond our data"
+            rows.append(Row(meta, None, "post", note))
+    return rows

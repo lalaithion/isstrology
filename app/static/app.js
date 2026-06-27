@@ -48,7 +48,7 @@ geoBtn.addEventListener("click", () => {
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  result.innerHTML = '<div class="result"><p>Consulting the orbit…</p></div>';
+  result.innerHTML = '<p class="loading">Charting the heavens…</p>';
   const data = new FormData(form);
   // Don't send the synthetic "My location (...)" label as a place name.
   if (latEl.value && lonEl.value) data.set("place", "");
@@ -61,6 +61,6 @@ form.addEventListener("submit", async (e) => {
     result.innerHTML = await resp.text();
   } catch (err) {
     result.innerHTML =
-      '<div class="result error"><p>⚠️ Couldn\'t reach the server — check your connection and try again.</p></div>';
+      '<div class="notice">⚠️ Couldn\'t reach the server — check your connection and try again.</div>';
   }
 });

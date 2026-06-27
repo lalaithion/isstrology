@@ -1,42 +1,67 @@
 {% if error %}
-<div class="result error">
-  <p>⚠️ {{ error }}</p>
-</div>
+<div class="notice">⚠️ {{ error }}</div>
 {% else %}
-<div class="result">
-  <p class="object-line">{{ result.target.emoji }} {{ result.target.name }} was in…</p>
-  <div class="sign">
-    <span class="glyph">{{ result.sign.symbol }}</span>
-    <h2>{{ result.sign.name }}</h2>
+
+{%- macro detail(r) -%}
+  {%- if r.meta.category == 'satellite' -%}
+    {%- if r.result.visible %}overhead {{ "%.0f"|format(r.result.altitude_degrees) }}°{% else %}below the horizon{% endif -%}
+  {%- else -%}
+    {{ "%.1f"|format(r.result.distance_au) }} AU
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro row(r) -%}
+<div class="row-item {{ 'absent' if r.status != 'ok' }}">
+  <span class="obj"><span class="obj-emoji">{{ r.meta.emoji }}</span>{{ r.meta.name[4:] if r.meta.name.startswith("the ") else r.meta.name }}</span>
+  {%- if r.status == 'ok' %}
+  <span class="obj-sign"><span class="glyph">{{ r.result.sign.symbol }}</span>{{ r.result.sign.name }}</span>
+  <span class="obj-aside">{{ detail(r) }}</span>
+  {%- else %}
+  <span class="obj-sign none">— {{ r.note }}</span>
+  <span class="obj-aside"></span>
+  {%- endif %}
+</div>
+{%- endmacro -%}
+
+<div class="reading">
+  <p class="context">
+    {{ local_time.strftime('%-d %B %Y') }} · {{ local_time.strftime('%H:%M') }} {{ tz_name }}
+    <span class="context-place">{{ location_label }}</span>
+  </p>
+
+  {% if hero %}
+  <div class="hero {{ 'is-empty' if hero.status != 'ok' }}">
+    <p class="hero-obj">{{ hero.meta.emoji }} The ISS was in</p>
+    {% if hero.status == 'ok' %}
+    <div class="hero-sign">
+      <span class="hero-glyph">{{ hero.result.sign.symbol }}</span>
+      <span class="hero-name">{{ hero.result.sign.name }}</span>
+    </div>
+    <p class="hero-flavor">{{ hero.result.sign.flavor|capitalize }}.</p>
+    <p class="hero-meta">
+      {% if hero.result.visible %}{{ "%.0f"|format(hero.result.altitude_degrees) }}° above the horizon{% else %}below the horizon, on the far side of Earth{% endif %}
+      · {{ "{:,.0f}".format(hero.result.distance_km) }} km · {{ hero.result.confidence }} confidence
+    </p>
+    {% else %}
+    <p class="hero-empty">{{ hero.note }}.</p>
+    {% endif %}
   </div>
-  <p class="flavor">{{ result.target.name }} was {{ result.sign.flavor }}.</p>
-
-  <dl class="detail">
-    <div><dt>Your moment</dt>
-      <dd>{{ local_time.strftime('%Y-%m-%d %H:%M') }} ({{ tz_name }})</dd></div>
-    <div><dt>Location</dt><dd>{{ location_label }}</dd></div>
-    <div><dt>Overhead?</dt>
-      <dd>{% if result.visible %}Yes — {{ "%.0f"|format(result.altitude_degrees) }}° above the horizon
-          {% else %}No — below the horizon ({{ "%.0f"|format(result.altitude_degrees) }}°){% endif %}</dd></div>
-    <div><dt>Distance</dt>
-      <dd>{% if result.target.category == 'satellite' %}{{ "{:,.0f}".format(result.distance_km) }} km
-          {% else %}{{ "%.2f"|format(result.distance_au) }} AU{% endif %}</dd></div>
-    <div><dt>Ecliptic longitude</dt>
-      <dd>{{ "%.1f"|format(result.ecliptic_longitude) }}°</dd></div>
-    <div><dt>RA / Dec</dt>
-      <dd>{{ "%.2f"|format(result.ra_hours) }}h / {{ "%+.1f"|format(result.dec_degrees) }}°</dd></div>
-  </dl>
-
-  {% if result.target.category == 'body' %}
-  <p class="aside">This far away, your exact spot on Earth barely changes the
-    answer — but for a low satellite like the ISS it changes everything.</p>
   {% endif %}
 
-  <p class="confidence conf-{{ result.confidence }}">
-    Based on {{ result.provenance }} — {{ result.confidence }} confidence.
-    {% if result.target.category == 'satellite' and result.confidence != 'high' %}
-      The sign shifts every few minutes for something this close, so treat this as approximate.
-    {% endif %}
+  <div class="group">
+    <h3 class="group-title">Satellites &amp; stations</h3>
+    {% for r in satellites if r.meta.key != 'iss' %}{{ row(r) }}{% endfor %}
+  </div>
+
+  <div class="group">
+    <h3 class="group-title">Dwarf planets &amp; distant worlds</h3>
+    {% for r in bodies %}{{ row(r) }}{% endfor %}
+  </div>
+
+  <p class="reading-foot">
+    Faded rows weren't out there yet — or had already come home. Low satellites
+    shift sign every few minutes and depend on where you stand; the distant
+    worlds look the same from anywhere on Earth.
   </p>
 </div>
 {% endif %}

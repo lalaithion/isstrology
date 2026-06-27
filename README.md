@@ -49,7 +49,12 @@ pip install -r requirements-dev.txt
 
 ```bash
 python scripts/fetch_bodies.py        # DE421 ephemeris + dwarf-planet elements
+python scripts/precompute_bodies.py   # -> data/bodies_grid.npz (served at runtime)
 ```
+
+The second step bakes each body's apparent ecliptic longitude + distance into a
+daily grid, so the request path is a microsecond lookup with no ephemeris math.
+DE421 is only needed for this build step, not at runtime.
 
 **Satellites** need orbital data per object:
 

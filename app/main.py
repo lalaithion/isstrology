@@ -1,4 +1,4 @@
-"""ISStrology v2 web app: date + time + location -> the ISS's zodiac sign."""
+"""ISStrology v2 web app: date + time + location -> every object's zodiac sign."""
 
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import astronomy, geocode, targets
-from .tle_archive import OutOfCoverageError
+from . import astronomy, geocode
 
 logger = logging.getLogger("isstrology")
 BASE_DIR = Path(__file__).resolve().parent
@@ -22,20 +21,9 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
-def _target_groups():
-    metas = [t.meta for t in targets.all_targets()]
-    return (
-        [m for m in metas if m.category == "satellite"],
-        [m for m in metas if m.category == "body"],
-    )
-
-
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    satellites, bodies = _target_groups()
-    return templates.TemplateResponse(
-        request, "index.html", {"satellites": satellites, "bodies": bodies}
-    )
+    return templates.TemplateResponse(request, "index.html", {})
 
 
 def _parse_coords(lat: str | None, lon: str | None) -> tuple[float, float] | None:
@@ -59,7 +47,6 @@ def calculate(
     request: Request,
     date: str = Form(...),
     time: str = Form(...),
-    target: str = Form("iss"),
     place: str | None = Form(None),
     lat: str | None = Form(None),
     lon: str | None = Form(None),
@@ -92,30 +79,25 @@ def calculate(
 
     try:
         when_utc, tz_name = astronomy.local_to_utc(naive_local, location_lat, location_lon)
-        result = astronomy.compute(target, when_utc, location_lat, location_lon)
-    except OutOfCoverageError as exc:
-        return _error(request, str(exc))
-    except targets.MissingDataError:
-        return _error(
-            request,
-            "We haven't loaded the orbital data for that object yet — try the "
-            "ISS, or check back soon.",
-        )
-    except KeyError:
-        return _error(request, "That object isn't on the menu — pick one from the list.")
+        rows = astronomy.compute_all(when_utc, location_lat, location_lon)
     except Exception:  # last-resort guard: never show a raw 500 to the user
-        logger.exception("Unexpected error computing sign")
+        logger.exception("Unexpected error computing signs")
         return _error(
             request,
             "Something went sideways working that out. Please try again — and if "
             "it keeps happening, try a slightly different time or place.",
         )
 
+    satellites = [r for r in rows if r.meta.category == "satellite"]
+    bodies = [r for r in rows if r.meta.category == "body"]
+    hero = next((r for r in rows if r.meta.key == "iss"), None)
     return templates.TemplateResponse(
         request,
         "result.html",
         {
-            "result": result,
+            "hero": hero,
+            "satellites": satellites,
+            "bodies": bodies,
             "location_label": location_label,
             "tz_name": tz_name,
             "local_time": naive_local,

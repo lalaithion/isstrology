@@ -1,45 +1,40 @@
 """Registry of trackable objects and how to locate each in the sky.
 
-Two kinds of target share one interface so the rest of the app stays uniform:
+Two kinds of target, computed very differently:
 
-  SatelliteTarget — Earth satellites via SGP4 (ISS, Hubble, Mir, ...). The
-      observer's position matters enormously here: low orbits have huge parallax.
+  SatelliteTarget — live SGP4. The observer's position matters enormously (low
+      orbits have huge parallax) and the sign shifts every few minutes, so there
+      is nothing to precompute; the TLE history IS the precomputed input.
 
-  BodyTarget — solar-system bodies via a planetary ephemeris and (for the
-      dwarf planets) two-body propagation of osculating elements. These are so
-      far away that the observer's location barely changes the answer.
+  BodyTarget — a pure lookup into a precomputed daily grid (see body_grid.py and
+      scripts/precompute_bodies.py). Bodies move slowly and their parallax is
+      negligible, so the heavy ephemeris/Kepler math is done once at build time
+      and kept out of the request path entirely.
 
-This is the one extension seam the app needs. Adding an object = one catalog
-entry plus its data file; deliberately not a provider/router hierarchy."""
+Adding an object = one catalog entry plus its data; deliberately a flat registry,
+not a provider/router hierarchy."""
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 
-from skyfield.api import EarthSatellite, load, load_file, wgs84
-from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
+from skyfield.api import EarthSatellite, load, wgs84
 
-try:  # public in some Skyfield versions, underscore-prefixed in others (e.g. 1.49)
-    from skyfield.keplerlib import KeplerOrbit
-except ImportError:
-    from skyfield.keplerlib import _KeplerOrbit as KeplerOrbit
-
-from . import tle_archive
+from . import body_grid, tle_archive
 from .tle_archive import OutOfCoverageError
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TLE_DIR = DATA_DIR / "tle"
 BODY_DIR = DATA_DIR / "bodies"
-EPHEM_PATH = DATA_DIR / "ephemeris" / "de421.bsp"
+EPHEM_PATH = DATA_DIR / "ephemeris" / "de421.bsp"  # build-time input only
 
 AU_KM = 149_597_870.7
 _GRACE = timedelta(days=14)
 
-# One timescale + ephemeris for the whole app (built-in data, no runtime network).
+# One timescale for the whole app (built-in data, no runtime network).
 _ts = load.timescale()
 
 
@@ -48,7 +43,7 @@ def timescale():
 
 
 class MissingDataError(RuntimeError):
-    """A target's data file hasn't been fetched yet."""
+    """A target's data file hasn't been built/fetched yet."""
 
 
 @dataclass(frozen=True)
@@ -62,9 +57,18 @@ class TargetMeta:
 
 @dataclass(frozen=True)
 class Observation:
-    position: object  # a Skyfield position: ecliptic_latlon / radec / altaz / distance
-    provenance: str
-    confidence: str
+    """Final, display-ready values for one object. Satellite-only fields are
+    None for bodies (which the UI never asks of them)."""
+    ecliptic_longitude: float
+    distance_au: float
+    distance_km: float | None = None
+    ra_hours: float | None = None
+    dec_degrees: float | None = None
+    altitude_degrees: float | None = None
+    azimuth_degrees: float | None = None
+    visible: bool | None = None
+    provenance: str = ""
+    confidence: str = "high"
 
 
 # --- catalogs -------------------------------------------------------------
@@ -87,8 +91,9 @@ _SATELLITES = [
      "the first space station ever, briefly aloft in 1971"),
 ]
 
-# (key, name, emoji, ephemeris-segment-name | None, blurb). A segment name means
-# read it straight from the ephemeris (Pluto); None means osculating elements.
+# (key, name, emoji, ephemeris-segment-name | None, blurb). The segment name is
+# only used by the build script (Pluto reads straight from the ephemeris; the
+# rest come from osculating elements). At serve time every body is a grid lookup.
 _BODIES = [
     ("pluto", "Pluto", "♇", "pluto barycenter",
      "the famous demoted dwarf planet"),
@@ -104,29 +109,10 @@ _BODIES = [
      "a remote world on an 11,000-year orbit"),
 ]
 
-
-# --- ephemeris helpers ----------------------------------------------------
-
-@lru_cache(maxsize=1)
-def _ephemeris():
-    if not EPHEM_PATH.exists():
-        raise MissingDataError(
-            "Planetary ephemeris (de421.bsp) is missing. "
-            "Run scripts/fetch_bodies.py."
-        )
-    return load_file(str(EPHEM_PATH))
-
-
-@lru_cache(maxsize=1)
-def _ephem_coverage() -> tuple[datetime, datetime]:
-    """Intersection of all ephemeris segment spans, as UTC datetimes."""
-    segs = _ephemeris().spk.segments
-    start = max(s.start_jd for s in segs)
-    end = min(s.end_jd for s in segs)
-    return (
-        _ts.tdb_jd(start).utc_datetime(),
-        _ts.tdb_jd(end).utc_datetime(),
-    )
+_BODY_GRID_MISSING = (
+    "Precomputed body data is missing. Run scripts/fetch_bodies.py then "
+    "scripts/precompute_bodies.py."
+)
 
 
 @lru_cache(maxsize=16)
@@ -182,65 +168,60 @@ class SatelliteTarget:
     def coverage(self) -> tuple[datetime, datetime]:
         return _load_tle_archive(self.meta.key).coverage
 
-    def observe(self, t, observer, when_utc) -> Observation:
+    def observe(self, when_utc, lat, lon, elevation_m=0.0) -> Observation:
         archive = _load_tle_archive(self.meta.key)
         first, last = archive.coverage
         _check_coverage(self.meta, first, last, when_utc, decayed=self.decayed)
         elset = archive.nearest(when_utc)
+
         sat = EarthSatellite(elset.line1, elset.line2, self.meta.name, _ts)
-        position = (sat - observer).at(t)
+        observer = wgs84.latlon(lat, lon, elevation_m=elevation_m)
+        t = _ts.from_datetime(when_utc)
+        pos = (sat - observer).at(t)
+
+        _lat, ecl_lon, _ = pos.ecliptic_latlon(epoch=t)
+        ra, dec, dist = pos.radec(epoch=t)
+        alt, az, _ = pos.altaz()
         staleness_h = abs((when_utc - elset.epoch).total_seconds()) / 3600.0
-        provenance = (f"orbital element set from {elset.epoch:%Y-%m-%d %H:%M UTC} "
-                      f"({staleness_h:.0f}h from your moment)")
-        return Observation(position, provenance, _confidence(staleness_h))
+        return Observation(
+            ecliptic_longitude=ecl_lon.degrees % 360.0,
+            distance_km=dist.km,
+            distance_au=dist.au,
+            ra_hours=ra.hours,
+            dec_degrees=dec.degrees,
+            altitude_degrees=alt.degrees,
+            azimuth_degrees=az.degrees,
+            visible=alt.degrees > 0.0,
+            provenance=(f"orbital element set from {elset.epoch:%Y-%m-%d %H:%M UTC} "
+                        f"({staleness_h:.0f}h from your moment)"),
+            confidence=_confidence(staleness_h),
+        )
 
 
 class BodyTarget:
     def __init__(self, meta: TargetMeta, segment_name: str | None):
         self.meta = meta
-        self.segment_name = segment_name
+        self.segment_name = segment_name  # used only by the build script
 
     def coverage(self) -> tuple[datetime, datetime]:
-        return _ephem_coverage()
+        try:
+            return body_grid.coverage()
+        except FileNotFoundError as exc:
+            raise MissingDataError(_BODY_GRID_MISSING) from exc
 
-    def _body(self):
-        eph = _ephemeris()
-        if self.segment_name is not None:
-            return eph[self.segment_name]
-        # Two-body orbit from JPL osculating elements (plenty accurate for a
-        # 30°-wide sign bin). _from_mean_anomaly is internal to Skyfield but the
-        # dependency is version-pinned, so the signature is stable for us.
-        el = _load_body_elements(self.meta.key)
-        semilatus_rectum_au = el["a"] * (1.0 - el["e"] ** 2)
-        orbit = KeplerOrbit._from_mean_anomaly(
-            semilatus_rectum_au,
-            el["e"],
-            el["i"],
-            el["om"],
-            el["w"],
-            el["ma"],
-            _ts.tdb_jd(el["epoch"]),
-            GM_SUN,
-            center=10,  # heliocentric (Sun = SPK id 10)
-        )
-        return eph["sun"] + orbit
-
-    def observe(self, t, observer, when_utc) -> Observation:
-        first, last = _ephem_coverage()
+    def observe(self, when_utc, lat, lon, elevation_m=0.0) -> Observation:
+        first, last = self.coverage()
         _check_coverage(self.meta, first, last, when_utc)
-        eph = _ephemeris()
-        position = (eph["earth"] + observer).at(t).observe(self._body()).apparent()
-        return Observation(position, "JPL DE421 ephemeris", "high")
-
-
-@lru_cache(maxsize=16)
-def _load_body_elements(key: str) -> dict:
-    path = BODY_DIR / f"{key}.json"
-    if not path.exists():
-        raise MissingDataError(
-            f"Orbital elements for {key} are missing. Run scripts/fetch_bodies.py."
+        try:
+            ecl_lon, dist_au = body_grid.lookup(self.meta.key, when_utc)
+        except FileNotFoundError as exc:
+            raise MissingDataError(_BODY_GRID_MISSING) from exc
+        return Observation(
+            ecliptic_longitude=ecl_lon,
+            distance_au=dist_au,
+            provenance="precomputed from JPL DE421 ephemeris",
+            confidence="high",
         )
-    return json.loads(path.read_text())
 
 
 # --- registry -------------------------------------------------------------

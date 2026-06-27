@@ -10,8 +10,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app import astronomy, targets, tle_archive
+from app.body_grid import GRID_PATH
 from app.tle_archive import OutOfCoverageError, TLEArchive, parse_tle_epoch
-from app.targets import EPHEM_PATH, BODY_DIR
 from app.zodiac import SIGNS, sign_for_longitude
 
 # A real historical ISS TLE (epoch 2021-09-06), enough to propagate a few hours.
@@ -19,8 +19,10 @@ ISS_L1 = "1 25544U 98067A   21249.51782528  .00001764  00000-0  39879-4 0  9990"
 ISS_L2 = "2 25544  51.6442 213.4501 0003193  85.0982  47.5572 15.48685836300438"
 EPOCH = parse_tle_epoch(ISS_L1)
 
-_HAS_BODIES = EPHEM_PATH.exists() and (BODY_DIR / "ceres.json").exists()
-needs_bodies = pytest.mark.skipif(not _HAS_BODIES, reason="run scripts/fetch_bodies.py")
+_HAS_BODIES = GRID_PATH.exists()
+needs_bodies = pytest.mark.skipif(
+    not _HAS_BODIES, reason="run scripts/fetch_bodies.py + scripts/precompute_bodies.py"
+)
 
 
 @pytest.fixture(autouse=True)

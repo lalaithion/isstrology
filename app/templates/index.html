@@ -3,59 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ISStrology — what sign was the ISS in?</title>
+  <title>ISStrology — what sign was everything in?</title>
+  <meta name="description" content="The zodiac sign of the ISS, dwarf planets, and historic spacecraft for any moment and place.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <main class="card">
-    <h1>ISStrology <span class="orbit">🛰️</span></h1>
-    <p class="tagline">
-      Pick a moment and a place. We'll tell you which zodiac sign the
-      International Space Station was crossing overhead — as seen from
-      exactly where you stood.
-    </p>
+  <main class="shell">
+    <header class="masthead">
+      <p class="eyebrow">ISStrology</p>
+      <h1>What sign was<br>the sky wearing?</h1>
+      <p class="lede">
+        Choose a moment and a place. We chart the zodiac sign of the
+        International Space Station, the dwarf planets, and a handful of
+        historic spacecraft — exactly as they stood over your head.
+      </p>
+    </header>
 
-    <form id="form" autocomplete="off">
-      <label>Object
-        <select name="target" id="target">
-          <optgroup label="Satellites &amp; stations">
-            {% for m in satellites %}
-            <option value="{{ m.key }}">{{ m.emoji }} {{ m.name[4:] if m.name.startswith("the ") else m.name }}</option>
-            {% endfor %}
-          </optgroup>
-          <optgroup label="Dwarf planets &amp; distant worlds">
-            {% for m in bodies %}
-            <option value="{{ m.key }}">{{ m.emoji }} {{ m.name }}</option>
-            {% endfor %}
-          </optgroup>
-        </select>
-      </label>
-
+    <form id="form" autocomplete="off" class="query">
       <div class="row">
         <label>Date
           <input type="date" name="date" id="date" required>
         </label>
-        <label>Time (local)
+        <label>Time <span class="sub">local</span>
           <input type="time" name="time" id="time" required>
         </label>
       </div>
 
-      <label>Location
+      <label>Place
         <input type="text" name="place" id="place"
-               placeholder="e.g., Reykjavík, Iceland">
+               placeholder="Reykjavík, Iceland">
       </label>
       <input type="hidden" name="lat" id="lat">
       <input type="hidden" name="lon" id="lon">
 
-      <div class="row">
-        <button type="button" id="geo">📍 Use my location</button>
-        <button type="submit" id="submit">Read the stars</button>
+      <div class="actions">
+        <button type="button" id="geo" class="ghost">Use my location</button>
+        <button type="submit" id="submit">Read the sky →</button>
       </div>
       <p class="hint" id="geo-status"></p>
     </form>
 
     <section id="result" aria-live="polite"></section>
+
+    <footer class="colophon">
+      <span>Positions via SGP4 &amp; JPL ephemerides.</span>
+      <span>Tropical zodiac, ecliptic of date.</span>
+    </footer>
   </main>
-  <script src="/static/app.js"></script>
+  <script defer src="/static/starfield.js"></script>
+  <script defer src="/static/app.js"></script>
 </body>
 </html>
