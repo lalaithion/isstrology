@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ISStrology — what sign was the ISS in?</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1>ISStrology <span class="orbit">🛰️</span></h1>
+    <p class="tagline">
+      Pick a moment and a place. We'll tell you which zodiac sign the
+      International Space Station was crossing overhead — as seen from
+      exactly where you stood.
+    </p>
+
+    <form id="form" autocomplete="off">
+      <label>Object
+        <select name="target" id="target">
+          <optgroup label="Satellites &amp; stations">
+            {% for m in satellites %}
+            <option value="{{ m.key }}">{{ m.emoji }} {{ m.name[4:] if m.name.startswith("the ") else m.name }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Dwarf planets &amp; distant worlds">
+            {% for m in bodies %}
+            <option value="{{ m.key }}">{{ m.emoji }} {{ m.name }}</option>
+            {% endfor %}
+          </optgroup>
+        </select>
+      </label>
+
+      <div class="row">
+        <label>Date
+          <input type="date" name="date" id="date" required>
+        </label>
+        <label>Time (local)
+          <input type="time" name="time" id="time" required>
+        </label>
+      </div>
+
+      <label>Location
+        <input type="text" name="place" id="place"
+               placeholder="e.g., Reykjavík, Iceland">
+      </label>
+      <input type="hidden" name="lat" id="lat">
+      <input type="hidden" name="lon" id="lon">
+
+      <div class="row">
+        <button type="button" id="geo">📍 Use my location</button>
+        <button type="submit" id="submit">Read the stars</button>
+      </div>
+      <p class="hint" id="geo-status"></p>
+    </form>
+
+    <section id="result" aria-live="polite"></section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

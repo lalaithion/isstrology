@@ -1,0 +1,42 @@
+{% if error %}
+<div class="result error">
+  <p>⚠️ {{ error }}</p>
+</div>
+{% else %}
+<div class="result">
+  <p class="object-line">{{ result.target.emoji }} {{ result.target.name }} was in…</p>
+  <div class="sign">
+    <span class="glyph">{{ result.sign.symbol }}</span>
+    <h2>{{ result.sign.name }}</h2>
+  </div>
+  <p class="flavor">{{ result.target.name }} was {{ result.sign.flavor }}.</p>
+
+  <dl class="detail">
+    <div><dt>Your moment</dt>
+      <dd>{{ local_time.strftime('%Y-%m-%d %H:%M') }} ({{ tz_name }})</dd></div>
+    <div><dt>Location</dt><dd>{{ location_label }}</dd></div>
+    <div><dt>Overhead?</dt>
+      <dd>{% if result.visible %}Yes — {{ "%.0f"|format(result.altitude_degrees) }}° above the horizon
+          {% else %}No — below the horizon ({{ "%.0f"|format(result.altitude_degrees) }}°){% endif %}</dd></div>
+    <div><dt>Distance</dt>
+      <dd>{% if result.target.category == 'satellite' %}{{ "{:,.0f}".format(result.distance_km) }} km
+          {% else %}{{ "%.2f"|format(result.distance_au) }} AU{% endif %}</dd></div>
+    <div><dt>Ecliptic longitude</dt>
+      <dd>{{ "%.1f"|format(result.ecliptic_longitude) }}°</dd></div>
+    <div><dt>RA / Dec</dt>
+      <dd>{{ "%.2f"|format(result.ra_hours) }}h / {{ "%+.1f"|format(result.dec_degrees) }}°</dd></div>
+  </dl>
+
+  {% if result.target.category == 'body' %}
+  <p class="aside">This far away, your exact spot on Earth barely changes the
+    answer — but for a low satellite like the ISS it changes everything.</p>
+  {% endif %}
+
+  <p class="confidence conf-{{ result.confidence }}">
+    Based on {{ result.provenance }} — {{ result.confidence }} confidence.
+    {% if result.target.category == 'satellite' and result.confidence != 'high' %}
+      The sign shifts every few minutes for something this close, so treat this as approximate.
+    {% endif %}
+  </p>
+</div>
+{% endif %}

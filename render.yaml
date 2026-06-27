@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: isstrology2
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /healthz
+    autoDeploy: true
