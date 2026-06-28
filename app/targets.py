@@ -87,7 +87,7 @@ _SATELLITES = [
      "the Soviet/Russian station that flew 1986–2001"),
     ("skylab", "Skylab", "🛰️", 6633, True,
      "America's first space station, 1973–1979"),
-    ("salyut1", "Salyut 1", "☭", 4870, True,
+    ("salyut1", "Salyut 1", "☭", 5160, True,
      "the first space station ever, briefly aloft in 1971"),
 ]
 

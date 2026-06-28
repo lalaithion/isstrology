@@ -67,7 +67,16 @@ def _write(key: str, text: str) -> int:
     return n_pairs
 
 
-def fetch_full_history() -> None:
+def _selected(only):
+    sats = [s for s in _SATELLITES if not only or s[0] in only]
+    if only:
+        unknown = set(only) - {s[0] for s in _SATELLITES}
+        if unknown:
+            sys.exit(f"Unknown satellite key(s): {', '.join(sorted(unknown))}")
+    return sats
+
+
+def fetch_full_history(only=None) -> None:
     user = os.environ.get("SPACETRACK_USER")
     password = os.environ.get("SPACETRACK_PASS")
     if not user or not password:
@@ -85,7 +94,7 @@ def fetch_full_history() -> None:
             data={"identity": user, "password": password},
         )
         resp.raise_for_status()
-        for i, (key, name, _emoji, norad, _decayed, _blurb) in enumerate(_SATELLITES):
+        for i, (key, name, _emoji, norad, _decayed, _blurb) in enumerate(_selected(only)):
             if i:
                 # Gentle pacing so we stay well under the per-minute cap.
                 time.sleep(3.0)
@@ -101,10 +110,10 @@ def fetch_full_history() -> None:
             _write(key, data.text)
 
 
-def fetch_bootstrap() -> None:
+def fetch_bootstrap(only=None) -> None:
     headers = {"User-Agent": USER_AGENT}
     with httpx.Client(timeout=30.0, follow_redirects=True, headers=headers) as client:
-        for key, name, _emoji, norad, decayed, _blurb in _SATELLITES:
+        for key, name, _emoji, norad, decayed, _blurb in _selected(only):
             if decayed:
                 print(
                     f"{name} (NORAD {norad}): decayed — no current TLE on "
@@ -133,11 +142,17 @@ def main() -> None:
         action="store_true",
         help="CelesTrak current TLE only (no account); dev use.",
     )
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="KEY",
+        help="Fetch only these satellite keys (e.g. --only salyut1). Default: all.",
+    )
     args = parser.parse_args()
     if args.bootstrap:
-        fetch_bootstrap()
+        fetch_bootstrap(only=args.only)
     else:
-        fetch_full_history()
+        fetch_full_history(only=args.only)
 
 
 if __name__ == "__main__":
