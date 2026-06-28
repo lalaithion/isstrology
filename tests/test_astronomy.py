@@ -119,6 +119,19 @@ def test_parse_coords_treats_empty_as_absent():
     assert _parse_coords("40.0", "-105.0") == (40.0, -105.0)
 
 
+def test_coords_from_text():
+    """Editing the 'My location (...)' label, or typing a bare pair, works;
+    ordinary place names don't get misread as coordinates."""
+    from app.main import _coords_from_text
+
+    assert _coords_from_text("My location (40.00076, -105.23902)") == (40.00076, -105.23902)
+    assert _coords_from_text("40.7, -74.0") == (40.7, -74.0)
+    assert _coords_from_text("Boulder, CO") is None
+    assert _coords_from_text("") is None
+    assert _coords_from_text(None) is None
+    assert _coords_from_text("999, 0") is None  # out of range
+
+
 # --- body pipeline (needs fetched ephemeris) ------------------------------
 
 @needs_bodies

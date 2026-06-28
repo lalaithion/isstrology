@@ -31,8 +31,8 @@
 
   {% if hero %}
   <div class="hero {{ 'is-empty' if hero.status != 'ok' }}">
-    <p class="hero-obj">{{ hero.meta.emoji }} The ISS was in</p>
     {% if hero.status == 'ok' %}
+    <p class="hero-obj">{{ hero.meta.emoji }} The ISS was in</p>
     <div class="hero-sign">
       <span class="hero-glyph">{{ hero.result.sign.symbol }}</span>
       <span class="hero-name">{{ hero.result.sign.name }}</span>
@@ -43,25 +43,20 @@
       · {{ "{:,.0f}".format(hero.result.distance_km) }} km · {{ hero.result.confidence }} confidence
     </p>
     {% else %}
+    <p class="hero-obj">{{ hero.meta.emoji }} The ISS</p>
     <p class="hero-empty">{{ hero.note }}.</p>
     {% endif %}
   </div>
   {% endif %}
 
   <div class="group">
-    <h3 class="group-title">Satellites &amp; stations</h3>
+    <h3 class="group-title">Satellites</h3>
     {% for r in satellites if r.meta.key != 'iss' %}{{ row(r) }}{% endfor %}
   </div>
 
   <div class="group">
-    <h3 class="group-title">Dwarf planets &amp; distant worlds</h3>
+    <h3 class="group-title">Dwarf planets</h3>
     {% for r in bodies %}{{ row(r) }}{% endfor %}
   </div>
-
-  <p class="reading-foot">
-    Faded rows weren't out there yet — or had already come home. Low satellites
-    shift sign every few minutes and depend on where you stand; the distant
-    worlds look the same from anywhere on Earth.
-  </p>
 </div>
 {% endif %}

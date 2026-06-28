@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ISStrology — what sign was everything in?</title>
+  <title>ISStrology</title>
   <meta name="description" content="The zodiac sign of the ISS, dwarf planets, and historic spacecraft for any moment and place.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,41 +12,61 @@
 </head>
 <body>
   <main class="shell">
-    <header class="masthead">
-      <p class="eyebrow">ISStrology</p>
-      <h1>What sign was<br>the sky wearing?</h1>
-      <p class="lede">
-        Choose a moment and a place. We chart the zodiac sign of the
-        International Space Station, the dwarf planets, and a handful of
-        historic spacecraft — exactly as they stood over your head.
-      </p>
-    </header>
+    <div id="picker">
+      <header class="masthead">
+        <h1>Astrology for the space age</h1>
+      </header>
 
-    <form id="form" autocomplete="off" class="query">
-      <div class="row">
-        <label>Date
-          <input type="date" name="date" id="date" required>
-        </label>
-        <label>Time <span class="sub">local</span>
+      <form id="form" autocomplete="off" class="query">
+        <div class="field">
+          <span class="field-label">Date</span>
+          <div class="date-fields">
+            <select id="month" name="month" aria-label="Month" required>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+            <input type="text" id="day" name="day" inputmode="numeric" maxlength="2"
+                   placeholder="Day" aria-label="Day" required>
+            <input type="text" id="year" name="year" inputmode="numeric" maxlength="4"
+                   placeholder="Year" aria-label="Year" required>
+          </div>
+        </div>
+
+        <label>Time (local)
           <input type="time" name="time" id="time" required>
         </label>
-      </div>
 
-      <label>Place
-        <input type="text" name="place" id="place"
-               placeholder="Reykjavík, Iceland">
-      </label>
-      <input type="hidden" name="lat" id="lat">
-      <input type="hidden" name="lon" id="lon">
+        <label>Place
+          <input type="text" name="place" id="place"
+                 placeholder="Reykjavík, Iceland">
+        </label>
+        <input type="hidden" name="lat" id="lat">
+        <input type="hidden" name="lon" id="lon">
 
-      <div class="actions">
-        <button type="button" id="geo" class="ghost">Use my location</button>
-        <button type="submit" id="submit">Read the sky →</button>
-      </div>
-      <p class="hint" id="geo-status"></p>
-    </form>
+        <div class="actions">
+          <button type="button" id="geo" class="ghost">Use my location</button>
+          <button type="submit" id="submit">Launch from here →</button>
+        </div>
+        <p class="hint" id="geo-status"></p>
+      </form>
+    </div>
 
-    <section id="result" aria-live="polite"></section>
+    <div id="results-view" hidden>
+      <button type="button" id="back" class="back-btn">
+        ← Choose a new time and location
+      </button>
+      <section id="result" aria-live="polite"></section>
+    </div>
 
     <footer class="colophon">
       <span>Positions via SGP4 &amp; JPL ephemerides.</span>

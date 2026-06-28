@@ -37,13 +37,6 @@ body {
 }
 
 /* --- masthead --- */
-.eyebrow {
-  margin: 0 0 1.4rem;
-  font-size: .72rem;
-  text-transform: uppercase;
-  letter-spacing: .32em;
-  color: var(--gold-dim);
-}
 .masthead h1 {
   margin: 0;
   font-family: var(--serif);
@@ -52,27 +45,26 @@ body {
   line-height: 1.03;
   letter-spacing: -0.02em;
 }
-.lede {
-  margin: 1.3rem 0 0;
-  max-width: 48ch;
-  color: var(--muted);
-  font-size: 1.02rem;
-  line-height: 1.62;
-}
-
 /* --- query form --- */
 .query { margin-top: 2.6rem; display: flex; flex-direction: column; gap: 1.1rem; }
-.row { display: flex; gap: 1rem; }
-.row > * { flex: 1; }
+
+/* Date as Month / Day / Year, to avoid the native date picker. */
+.field { display: flex; flex-direction: column; gap: .5rem; }
+.field-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+.date-fields { display: flex; gap: .6rem; }
+.date-fields > * { min-width: 0; }
+.date-fields select { flex: 2; }
+.date-fields #day { flex: 1; }
+.date-fields #year { flex: 1.4; }
 
 label {
   display: flex; flex-direction: column; gap: .5rem;
   font-size: .7rem; text-transform: uppercase; letter-spacing: .14em;
   color: var(--muted);
 }
-label .sub { text-transform: none; letter-spacing: 0; color: var(--faint); }
 
-input {
+input, select {
+  width: 100%;
   font-family: var(--sans); font-size: 1rem; color: var(--ink);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
@@ -80,7 +72,7 @@ input {
   transition: border-color .15s ease, background .15s ease;
 }
 input::placeholder { color: var(--faint); }
-input:focus {
+input:focus, select:focus {
   outline: none; border-color: var(--gold);
   background: rgba(255, 255, 255, 0.06);
 }
@@ -98,8 +90,16 @@ button {
 
 .hint { margin: 0; min-height: 1.1em; font-size: .8rem; color: var(--muted); }
 
+/* --- results view --- */
+.back-btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--sans); font-size: .85rem; color: var(--muted);
+  letter-spacing: .02em; margin-bottom: 1.8rem;
+}
+.back-btn:hover { color: var(--gold); }
+
 /* --- result reading --- */
-.reading { margin-top: 2.8rem; }
+.reading { margin-top: 0; }
 .context {
   margin: 0; font-size: .8rem; color: var(--muted); letter-spacing: .02em;
 }
@@ -153,8 +153,6 @@ button {
 
 .row-item.absent { opacity: .42; }
 .row-item.absent .obj-emoji { filter: grayscale(1); }
-
-.reading-foot { margin-top: 1.6rem; max-width: 54ch; font-size: .78rem; line-height: 1.65; color: var(--faint); }
 
 /* colophon */
 .colophon {

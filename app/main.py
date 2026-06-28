@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -36,6 +37,29 @@ def _parse_coords(lat: str | None, lon: str | None) -> tuple[float, float] | Non
         return None
 
 
+_MY_LOCATION_RE = re.compile(r"(?i)^\s*my location\s*\((.*)\)\s*$")
+_COORD_PAIR_RE = re.compile(r"^\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$")
+
+
+def _coords_from_text(text: str | None) -> tuple[float, float] | None:
+    """Pull a lat/lon pair from free text: a bare '40.1, -105.2' or the
+    'My location (40.1, -105.2)' label the geolocate button writes — so editing
+    those numbers works. Returns None for ordinary place names."""
+    if not text:
+        return None
+    s = text.strip()
+    wrapped = _MY_LOCATION_RE.match(s)
+    if wrapped:
+        s = wrapped.group(1)
+    m = _COORD_PAIR_RE.match(s)
+    if not m:
+        return None
+    lat, lon = float(m.group(1)), float(m.group(2))
+    if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0:
+        return (lat, lon)
+    return None
+
+
 def _error(request: Request, message: str) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "result.html", {"error": message}, status_code=200
@@ -45,7 +69,9 @@ def _error(request: Request, message: str) -> HTMLResponse:
 @app.post("/calculate", response_class=HTMLResponse)
 def calculate(
     request: Request,
-    date: str = Form(...),
+    year: str = Form(...),
+    month: str = Form(...),
+    day: str = Form(...),
     time: str = Form(...),
     place: str | None = Form(None),
     lat: str | None = Form(None),
@@ -53,7 +79,9 @@ def calculate(
 ):
     # Hidden lat/lon fields submit as "" when unused, so parse leniently:
     # empty -> absent. Coordinates (browser geolocation) win over a place name.
-    coords = _parse_coords(lat, lon)
+    # Explicit hidden fields (unedited geolocation) win; otherwise accept
+    # coordinates typed/edited into the place box before falling back to geocoding.
+    coords = _parse_coords(lat, lon) or _coords_from_text(place)
     if coords is not None:
         location_lat, location_lon = coords
         location_label = place.strip() if place and place.strip() else (
@@ -67,26 +95,21 @@ def calculate(
         location_lat, location_lon = found.lat, found.lon
         location_label = found.display_name
     else:
-        return _error(
-            request,
-            "Add a location first — type a place name, or tap “📍 Use my location.”",
-        )
+        return _error(request, "Please enter a location first.")
 
     try:
-        naive_local = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
-    except ValueError:
-        return _error(request, "That date or time didn't look right — please pick them again.")
+        y, mo, d = int(year), int(month), int(day)
+        hh, mm = (int(p) for p in time.split(":"))
+        naive_local = datetime(y, mo, d, hh, mm)
+    except (ValueError, TypeError):
+        return _error(request, "Your selected date is invalid.")
 
     try:
         when_utc, tz_name = astronomy.local_to_utc(naive_local, location_lat, location_lon)
         rows = astronomy.compute_all(when_utc, location_lat, location_lon)
     except Exception:  # last-resort guard: never show a raw 500 to the user
         logger.exception("Unexpected error computing signs")
-        return _error(
-            request,
-            "Something went sideways working that out. Please try again — and if "
-            "it keeps happening, try a slightly different time or place.",
-        )
+        return _error(request, "An unexpected error occurred. Please try again.")
 
     satellites = [r for r in rows if r.meta.category == "satellite"]
     bodies = [r for r in rows if r.meta.category == "body"]

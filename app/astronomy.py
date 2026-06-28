@@ -124,14 +124,14 @@ def compute_all(when_utc: datetime, lat: float, lon: float) -> list[Row]:
             continue
         if when_utc < first:
             note = ("Not yet launched" if meta.category == "satellite"
-                    else "Before our ephemeris")
+                    else "Please enter a date after 1900")
             rows.append(Row(meta, None, "pre", note))
         else:
             if meta.category != "satellite":
-                note = "After our ephemeris"
+                note = "Please enter a date before 2052"
             elif getattr(target, "decayed", False):
                 note = f"Re-entered {last:%Y}"
             else:
-                note = "Beyond our data"
+                note = f"Satellite positions not available after {last:%Y-%m-%d}"
             rows.append(Row(meta, None, "post", note))
     return rows

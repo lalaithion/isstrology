@@ -30,7 +30,7 @@ class Place:
 def geocode(query: str) -> Place:
     query = query.strip()
     if not query:
-        raise GeocodeError("Type a place name — like “Lisbon, Portugal.”")
+        raise GeocodeError("Enter a place name, for example, “Lisbon, Portugal.”")
     try:
         resp = httpx.get(
             NOMINATIM_URL,
@@ -47,7 +47,7 @@ def geocode(query: str) -> Place:
         ) from exc
     if not results:
         raise GeocodeError(
-            f"Couldn't find “{query}.” Try adding a region or country — "
+            f"Couldn't find “{query}.” Try adding a region or country, "
             "like “Springfield, Illinois.”"
         )
     top = results[0]
