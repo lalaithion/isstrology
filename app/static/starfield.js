@@ -50,9 +50,9 @@
   // Parallax layers, ordered far -> near. Each layer gets a different
   // density weight, size range, brightness range, and scroll factor.
   const LAYERS = [
-    { name: 'far',  weight: 0.55, minR: 0.4, maxR: 0.8, minA: 0.20, maxA: 0.45, scroll: 0.06 },
-    { name: 'mid',  weight: 0.30, minR: 0.7, maxR: 1.2, minA: 0.30, maxA: 0.65, scroll: 0.16 },
-    { name: 'near', weight: 0.15, minR: 1.2, maxR: 2.0, minA: 0.45, maxA: 0.90, scroll: 0.30 },
+    { name: 'far',  weight: 0.55, minR: 0.4, maxR: 0.8, minA: 0.20, maxA: 0.45, scroll: 0.02 },
+    { name: 'mid',  weight: 0.30, minR: 0.7, maxR: 1.2, minA: 0.30, maxA: 0.65, scroll: 0.05 },
+    { name: 'near', weight: 0.15, minR: 1.2, maxR: 2.0, minA: 0.45, maxA: 0.90, scroll: 0.10 },
   ];
 
   // Density: stars per "area unit". We clamp the total to a sensible range
@@ -70,13 +70,15 @@
     return { r: 240, g: 244, b: 255 };               // rest: soft blue-white
   }
 
-  // Planet palette: muted, distant. ringed flag marks the one with a ring.
+  // Planets look like bright, slightly-tinted points of light (Venus, Mars,
+  // Jupiter...), not blobs — a steady core with a faint bloom. What marks them
+  // as planets is that they slowly wander against the fixed stars.
   const PLANET_COLORS = [
-    { r: 178, g: 96,  b: 76 },  // dusty terracotta / red
-    { r: 214, g: 184, b: 120 }, // pale gold
-    { r: 120, g: 140, b: 176 }, // soft slate-blue
-    { r: 96,  g: 150, b: 146 }, // muted teal
-    { r: 140, g: 140, b: 148 }, // dim grey
+    { r: 255, g: 244, b: 214 }, // Venus — brilliant warm white
+    { r: 235, g: 138, b: 92 },  // Mars — orange-red
+    { r: 238, g: 228, b: 205 }, // Jupiter — pale cream
+    { r: 232, g: 210, b: 158 }, // Saturn — pale gold
+    { r: 205, g: 222, b: 255 }, // a cool blue-white
   ];
 
   // ----------------------------------------------------------------------
@@ -128,30 +130,25 @@
 
   function buildPlanets() {
     planets = [];
-    // 3-5 planets, scaled gently down on very small screens.
+    // A few planets, scaled gently down on very small screens.
     const small = Math.min(viewW, viewH) < 560;
-    const count = small ? 3 : 3 + Math.floor(Math.random() * 3); // 3..5
-
-    // Choose which (single) planet gets a ring.
-    const ringedIndex = Math.floor(Math.random() * count);
+    const count = small ? 2 : 3 + Math.floor(Math.random() * 2); // 3..4
 
     // Shuffle colors so each planet differs.
     const colors = PLANET_COLORS.slice().sort(() => Math.random() - 0.5);
 
     for (let i = 0; i < count; i++) {
-      const radius = 30 + Math.random() * 60; // 30..90px
-      const speed = 3 + Math.random() * 6;    // 3..9 px/second
+      // Slow wander: ~1–3 px/s, so you only notice the drift after a while.
+      const speed = 1.2 + Math.random() * 1.8;
       const angle = Math.random() * Math.PI * 2;
       planets.push({
         x: Math.random() * viewW,
         y: Math.random() * viewH,
-        r: radius,
+        r: 1.5 + Math.random() * 1.0,         // bright point, a touch larger than a star
         color: colors[i % colors.length],
-        opacity: 0.12 + Math.random() * 0.18, // 0.12..0.30
+        opacity: 0.85 + Math.random() * 0.15, // bright and steady
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        ringed: i === ringedIndex,
-        ringTilt: -0.5 + Math.random() * 1.0, // radians, for the ellipse
       });
     }
   }
@@ -210,29 +207,22 @@
   function drawPlanet(p) {
     const c = p.color;
 
-    // Soft glowing disc: radial gradient from a muted core to transparent.
-    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-    grad.addColorStop(0.0, `rgba(${c.r}, ${c.g}, ${c.b}, ${p.opacity})`);
-    grad.addColorStop(0.55, `rgba(${c.r}, ${c.g}, ${c.b}, ${p.opacity * 0.55})`);
+    // Faint bloom around the point, so a bright planet reads as a steady star
+    // with a little glow rather than a hard dot.
+    const glowR = p.r * 4.5;
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+    grad.addColorStop(0.0, `rgba(${c.r}, ${c.g}, ${c.b}, ${(p.opacity * 0.45).toFixed(3)})`);
     grad.addColorStop(1.0, `rgba(${c.r}, ${c.g}, ${c.b}, 0)`);
-
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // The one ringed planet: a single thin, faint elliptical stroke.
-    if (p.ringed) {
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.ringTilt);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, p.r * 1.6, p.r * 0.55, 0, 0, Math.PI * 2);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = `rgba(${c.r}, ${c.g}, ${c.b}, ${(p.opacity * 0.8).toFixed(3)})`;
-      ctx.stroke();
-      ctx.restore();
-    }
+    // Bright steady core (planets don't twinkle the way stars do).
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, ${p.opacity.toFixed(3)})`;
+    ctx.fill();
   }
 
   function render(timeSec, animate) {
