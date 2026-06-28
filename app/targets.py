@@ -73,39 +73,40 @@ class Observation:
 
 # --- catalogs -------------------------------------------------------------
 
-# (key, name, emoji, NORAD id, decayed?, blurb)
+# (key, name, emoji, NORAD id, decayed?, blurb). Ordered by launch date, newest first.
 _SATELLITES = [
-    ("iss", "the ISS", "🛰️", 25544, False,
-     "the International Space Station, home since 1998"),
-    ("tiangong", "Tiangong", "🇨🇳", 48274, False,
+    ("tiangong", "Tiangong", "🇨🇳", 48274, False,        # 2021-04-29
      "China's space station, crewed since 2021"),
-    ("hubble", "Hubble", "🔭", 20580, False,
+    ("iss", "the ISS", "🛰️", 25544, False,              # 1998-11-20
+     "the International Space Station, home since 1998"),
+    ("hubble", "Hubble", "🔭", 20580, False,            # 1990-04-24
      "the Hubble Space Telescope, watching the cosmos since 1990"),
-    ("vanguard1", "Vanguard 1", "🥫", 5, False,
-     "the oldest human-made object still in orbit (launched 1958)"),
-    ("mir", "Mir", "🚉", 16609, True,
+    ("mir", "Mir", "🚉", 16609, True,                    # 1986-02-19
      "the Soviet/Russian station that flew 1986–2001"),
-    ("skylab", "Skylab", "🛰️", 6633, True,
+    ("skylab", "Skylab", "🛰️", 6633, True,              # 1973-05-14
      "America's first space station, 1973–1979"),
-    ("salyut1", "Salyut 1", "☭", 5160, True,
+    ("salyut1", "Salyut 1", "☭", 5160, True,            # 1971-04-19
      "the first space station ever, briefly aloft in 1971"),
+    ("vanguard1", "Vanguard 1", "🥫", 5, False,          # 1958-03-17
+     "the oldest human-made object still in orbit (launched 1958)"),
 ]
 
 # (key, name, emoji, ephemeris-segment-name | None, blurb). The segment name is
 # only used by the build script (Pluto reads straight from the ephemeris; the
 # rest come from osculating elements). At serve time every body is a grid lookup.
+# Ordered by mean distance from the Sun (semi-major axis, AU).
 _BODIES = [
-    ("pluto", "Pluto", "♇", "pluto barycenter",
-     "the famous demoted dwarf planet"),
-    ("ceres", "Ceres", "⚳", None,
+    ("ceres", "Ceres", "⚳", None,                       # ~2.8 AU
      "the dwarf planet in the asteroid belt"),
-    ("eris", "Eris", "🪨", None,
-     "the scattered-disk dwarf planet whose discovery demoted Pluto"),
-    ("haumea", "Haumea", "🥚", None,
+    ("pluto", "Pluto", "♇", "pluto barycenter",         # ~39.5 AU
+     "the famous demoted dwarf planet"),
+    ("haumea", "Haumea", "🥚", None,                     # ~43 AU
      "an egg-shaped dwarf planet with its own ring"),
-    ("makemake", "Makemake", "🗿", None,
+    ("makemake", "Makemake", "🗿", None,                 # ~46 AU
      "a bright Kuiper-belt dwarf planet"),
-    ("sedna", "Sedna", "❄️", None,
+    ("eris", "Eris", "🪨", None,                         # ~68 AU
+     "the scattered-disk dwarf planet whose discovery demoted Pluto"),
+    ("sedna", "Sedna", "❄️", None,                       # ~506 AU
      "a remote world on an 11,000-year orbit"),
 ]
 
